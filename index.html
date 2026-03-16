@@ -359,6 +359,32 @@
     footer hr { border:none; border-top:1px solid rgba(255,255,255,.08); margin:18px 0; }
     footer a { color:inherit; }
 
+    /* ── 연휴 조합 결과 ── */
+    .combo-empty { padding: 24px; text-align: center; font-size: 14px; color: var(--muted); }
+    .combo-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+    .combo-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      background: var(--bg);
+      transition: border-color .12s;
+    }
+    .combo-card.top { border-color: var(--accent); background: var(--accent-lt); }
+    .combo-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .combo-total { font-size: 20px; font-weight: 900; letter-spacing: -.5px; color: var(--text); line-height: 1; }
+    .combo-meta { font-size: 12px; color: var(--muted); }
+    .combo-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+    .cb-best { background: var(--accent); color: #fff; }
+    .cb-eff  { background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; }
+    .combo-items { display: flex; flex-direction: column; gap: 5px; }
+    .combo-item { font-size: 13px; color: var(--sub); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .combo-item::before { content: '·'; color: var(--muted); }
+    .ci-name { flex: 1; min-width: 0; }
+    .ci-period { font-size: 11px; color: var(--muted); }
+    .ci-days { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+    .combo-card:not(.top) .ci-days { background: var(--accent-lt); color: var(--accent); border: 1px solid #C7D2FE; }
+    .combo-card.top .ci-days { background: rgba(255,255,255,.65); color: var(--accent); border: 1px solid #C7D2FE; }
+
     @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
     .fade-up { animation: fadeUp .22s ease; }
   </style>
@@ -515,42 +541,20 @@
   <!-- 연차 계산기 -->
   <section id="calculator" aria-label="황금연휴 연차 계산기">
     <div class="sec-hd">
-      <h2>내 연차로 가능한 황금연휴</h2>
-      <p>잔여 연차를 입력하면 가능 여부를 바로 알려드려요</p>
+      <h2>잔여 연차로 가능한 황금연휴 조합</h2>
+      <p>남은 연차 일수를 입력하면 최적 조합을 추려드려요</p>
     </div>
     <div class="calc-card">
-      <div class="two">
-        <div class="field" style="margin-bottom:0">
-          <label for="leave-total">전체 연차 일수</label>
-          <div class="ibox">
-            <input type="number" id="leave-total" value="15" min="1" max="25" aria-label="전체 연차 일수">
-            <span class="unit">일</span>
-          </div>
-        </div>
-        <div class="field" style="margin-bottom:0">
-          <label for="leave-used">이미 사용한 연차</label>
-          <div class="ibox">
-            <input type="number" id="leave-used" value="0" min="0" aria-label="이미 사용한 연차">
-            <span class="unit">일</span>
-          </div>
+      <div class="field" style="margin-bottom:0">
+        <label for="leave-remain">잔여 연차 일수</label>
+        <div class="ibox">
+          <input type="number" id="leave-remain" value="5" min="0" max="25"
+                 aria-label="잔여 연차 일수" oninput="calcCombos()">
+          <span class="unit">일</span>
         </div>
       </div>
-      <div class="field">
-        <label for="golden-sel">원하는 황금연휴</label>
-        <select id="golden-sel" aria-label="황금연휴 선택">
-          <option value="">황금연휴를 선택하세요</option>
-          <option value="2|9|설날 황금연휴|2/14~22">설날 황금연휴 9일 — 연차 2일 필요</option>
-          <option value="1|5|어린이날 황금연휴|5/1~5">어린이날 황금연휴 5일 — 연차 1일 필요</option>
-          <option value="3|9|개천절+한글날 황금연휴|10/3~11">개천절+한글날 황금연휴 9일 — 연차 3일 필요</option>
-          <option value="1|4|크리스마스 황금연휴|12/24~27">크리스마스 황금연휴 4일 — 연차 1일 필요</option>
-          <option value="1|4|삼일절 대체 황금연휴|2/28~3/3">삼일절 대체 황금연휴 4일 — 연차 1일 필요</option>
-        </select>
-      </div>
-      <button class="calc-btn" onclick="calcLeave()">계산하기</button>
-      <div class="c-result" id="c-result" role="alert" aria-live="polite">
-        <div class="cr-main" id="cr-main"></div>
-        <div class="cr-desc" id="cr-desc"></div>
-      </div>
+      <button class="calc-btn" style="margin-top:12px" onclick="calcCombos()">조합 보기</button>
+      <div id="combo-result" role="region" aria-live="polite"></div>
     </div>
   </section>
 
@@ -672,36 +676,96 @@ function buildList() {
   });
 }
 
-function calcLeave() {
-  const total  = +document.getElementById('leave-total').value || 0;
-  const used   = +document.getElementById('leave-used').value  || 0;
-  const selVal = document.getElementById('golden-sel').value;
-  const res    = document.getElementById('c-result');
+const GOLDEN = [
+  { name: '설날 황금연휴',         period: '2/14~22',  need: 2, days: 9 },
+  { name: '삼일절 대체 황금연휴',   period: '2/28~3/3', need: 1, days: 4 },
+  { name: '어린이날 황금연휴',      period: '5/1~5',    need: 1, days: 5 },
+  { name: '개천절+한글날 황금연휴', period: '10/3~11',  need: 3, days: 9 },
+  { name: '크리스마스 황금연휴',    period: '12/24~27', need: 1, days: 4 },
+];
 
-  if (!selVal) { alert('황금연휴를 선택해주세요.'); return; }
+function calcCombos() {
+  const budget = +document.getElementById('leave-remain').value || 0;
+  const wrap   = document.getElementById('combo-result');
 
-  const [need, days, name, period] = selVal.split('|');
-  const remain = total - used;
-
-  res.style.display = 'block';
-  res.style.animation = 'none';
-  requestAnimationFrame(() => { res.style.animation = ''; res.classList.add('fade-up'); });
-  setTimeout(() => res.classList.remove('fade-up'), 300);
-
-  if (remain < +need) {
-    res.className = 'c-result no';
-    document.getElementById('cr-main').textContent = `연차 ${+need - remain}일 부족`;
-    document.getElementById('cr-desc').textContent =
-      `${name} (${period})은 연차 ${need}일이 필요합니다. 현재 잔여 연차는 ${remain}일입니다.`;
-  } else {
-    res.className = 'c-result ok';
-    document.getElementById('cr-main').textContent = `${days}일 연속 휴가 가능 ✓`;
-    document.getElementById('cr-desc').textContent =
-      `${name} (${period}) — 연차 ${need}일 사용 후 ${remain - +need}일 남습니다.`;
+  if (budget <= 0) {
+    wrap.innerHTML = '<p class="combo-empty">연차 일수를 입력해주세요.</p>';
+    return;
   }
+
+  // 모든 부분집합(2^5 = 32) 열거 후 예산 내 필터
+  const n = GOLDEN.length;
+  const results = [];
+  for (let mask = 1; mask < (1 << n); mask++) {
+    let totalNeed = 0, totalDays = 0;
+    const items = [];
+    for (let i = 0; i < n; i++) {
+      if (mask & (1 << i)) {
+        totalNeed += GOLDEN[i].need;
+        totalDays += GOLDEN[i].days;
+        items.push(GOLDEN[i]);
+      }
+    }
+    if (totalNeed <= budget) {
+      results.push({ totalNeed, totalDays, items, eff: +(totalDays / totalNeed).toFixed(1) });
+    }
+  }
+
+  if (results.length === 0) {
+    wrap.innerHTML = '<p class="combo-empty">연차가 부족해서 만들 수 있는 황금연휴 조합이 없어요.<br>최소 1일이 있으면 어린이날 5일 연휴가 가능합니다.</p>';
+    return;
+  }
+
+  // 총 일수 내림차순 → 효율 내림차순 → 연차 오름차순
+  results.sort((a, b) => b.totalDays - a.totalDays || b.eff - a.eff || a.totalNeed - b.totalNeed);
+
+  // 중복 제거(totalDays+totalNeed 같으면 첫 번째만) 후 상위 5개
+  const seen = new Set();
+  const top  = [];
+  for (const r of results) {
+    const key = `${r.totalDays}-${r.totalNeed}`;
+    if (!seen.has(key)) { seen.add(key); top.push(r); }
+    if (top.length >= 5) break;
+  }
+
+  const maxDays = top[0].totalDays;
+  const maxEff  = Math.max(...top.map(r => r.eff));
+
+  let html = '<div class="combo-list">';
+  top.forEach((r, idx) => {
+    const isTop = r.totalDays === maxDays && idx === 0;
+    const isEff = !isTop && r.eff === maxEff;
+
+    const badges =
+      (isTop ? '<span class="combo-badge cb-best">최장 연휴</span>' : '') +
+      (isEff ? '<span class="combo-badge cb-eff">가성비 최고</span>' : '');
+
+    const itemsHtml = r.items.map(h =>
+      `<div class="combo-item">
+        <span class="ci-name">${h.name}</span>
+        <span class="ci-period">${h.period}</span>
+        <span class="ci-days">${h.days}일</span>
+      </div>`
+    ).join('');
+
+    html += `
+      <div class="combo-card ${isTop ? 'top' : ''}">
+        <div class="combo-head">
+          <span class="combo-total">총 ${r.totalDays}일 연휴</span>
+          <span class="combo-meta">연차 ${r.totalNeed}일 사용 · ${r.eff}일/연차</span>
+          ${badges}
+        </div>
+        <div class="combo-items">${itemsHtml}</div>
+      </div>`;
+  });
+  html += '</div>';
+
+  wrap.innerHTML = html;
+  wrap.classList.remove('fade-up');
+  requestAnimationFrame(() => wrap.classList.add('fade-up'));
 }
 
-document.addEventListener('DOMContentLoaded', buildList);
+document.addEventListener('DOMContentLoaded', () => { buildList(); calcCombos(); });
 </script>
 </body>
 </html>
